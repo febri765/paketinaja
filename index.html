@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAKETINAJA</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+color:white;
+overflow-x:hidden;
+background: linear-gradient(135deg,#ff4d6d,#4cc9f0,#7209b7,#f72585);
+background-size:400% 400%;
+animation:bg 10s ease infinite;
+}
+
+@keyframes bg{
+0%{background-position:0% 50%}
+50%{background-position:100% 50%}
+100%{background-position:0% 50%}
+}
+
+.header{
+text-align:center;
+padding:15px;
+font-weight:bold;
+font-size:18px;
+backdrop-filter: blur(10px);
+}
+
+.container{
+max-width:520px;
+margin:auto;
+padding:15px;
+}
+
+.card{
+background:rgba(0,0,0,0.5);
+backdrop-filter: blur(10px);
+padding:15px;
+border-radius:15px;
+margin-bottom:15px;
+}
+
+input,select{
+width:100%;
+padding:10px;
+margin:6px 0 10px;
+border:none;
+border-radius:8px;
+}
+
+button{
+width:100%;
+padding:12px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+font-weight:bold;
+margin-top:8px;
+}
+
+.green{background:#22c55e;}
+.blue{background:#3b82f6;color:white;}
+
+.order{
+background:rgba(0,0,0,0.4);
+padding:10px;
+border-radius:10px;
+margin-top:10px;
+}
+
+.status{
+font-size:12px;
+background:#111827;
+padding:5px;
+border-radius:6px;
+margin-top:5px;
+}
+
+#qrcode{
+display:flex;
+justify-content:center;
+margin-top:10px;
+}
+
+svg{
+background:white;
+padding:5px;
+border-radius:6px;
+margin-top:5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">🛍️ PAKETINAJA</div>
+
+<div class="container">
+
+<!-- FORM -->
+<div class="card">
+<h3>Form Paket</h3>
+
+<input id="item" placeholder="Nama Barang">
+<input id="city" placeholder="Negara / Kota">
+<input id="price" type="number" placeholder="Harga Barang">
+
+<input id="sender" placeholder="Nama Pengirim">
+<input id="receiver" placeholder="Nama Penerima">
+<input id="address" placeholder="Alamat Penerima">
+
+<select id="fee">
+<option value="150000">Basic - 150K</option>
+<option value="200000">Standard - 200K</option>
+<option value="650000">Express - 650K</option>
+</select>
+
+<button class="green" onclick="addOrder()">Tambah Order</button>
+</div>
+
+<!-- ORDER -->
+<div class="card">
+<h3>📦 Order List</h3>
+<div id="list"></div>
+<p id="total"></p>
+</div>
+
+<!-- QR -->
+<div class="card">
+<h3>🎟️ QR Invoice</h3>
+<div id="qrcode"></div>
+
+<button class="blue" onclick="downloadInvoice()">📄 Download Invoice PDF</button>
+</div>
+
+</div>
+
+<script>
+
+let orders=[];
+let active=null;
+
+/* ADD ORDER */
+function addOrder(){
+
+let item=itemValue("item");
+let city=itemValue("city");
+let price=parseInt(itemValue("price"));
+let fee=parseInt(itemValue("fee"));
+
+let sender=itemValue("sender");
+let receiver=itemValue("receiver");
+let address=itemValue("address");
+
+if(!item||!city||!price||!sender||!receiver||!address){
+alert("Isi semua!");
+return;
+}
+
+let id="PKT-"+rand();
+let tracking="TRK-"+rand();
+let total=price+fee;
+
+let order={
+id,tracking,item,city,price,fee,total,
+sender,receiver,address,
+status:"Menunggu"
+};
+
+orders.push(order);
+active=order;
+
+render();
+makeQR(order);
+payFlow(order);
+}
+
+/* HELP */
+function itemValue(id){
+return document.getElementById(id).value;
+}
+function rand(){
+return Math.floor(Math.random()*999999);
+}
+
+/* STATUS FLOW */
+function payFlow(o){
+
+setTimeout(()=>{o.status="Diproses 💼";render();},2000);
+setTimeout(()=>{o.status="Dikirim 🚚";render();},60000);
+setTimeout(()=>{o.status="Sampai 🎉";render();},200000);
+}
+
+/* RENDER */
+function render(){
+
+let list=document.getElementById("list");
+list.innerHTML="";
+let totalAll=0;
+
+orders.forEach(o=>{
+totalAll+=o.total;
+
+list.innerHTML+=`
+<div class="order">
+<b>${o.item}</b><br>
+📍 ${o.city}<br>
+👤 ${o.sender} → ${o.receiver}<br>
+🏠 ${o.address}<br>
+🆔 ${o.id}<br>
+📦 ${o.tracking}<br>
+💰 Rp ${o.total.toLocaleString()}<br>
+
+<div class="status">${o.status}</div>
+
+<svg id="bc-${o.tracking}"></svg>
+</div>
+`;
+
+setTimeout(()=>{
+JsBarcode("#bc-"+o.tracking,o.tracking,{
+format:"CODE128",
+width:2,
+height:40
+});
+},100);
+
+});
+
+document.getElementById("total").innerText=
+"Total: Rp "+totalAll.toLocaleString();
+}
+
+/* QR */
+function makeQR(o){
+document.getElementById("qrcode").innerHTML="";
+
+new QRCode(document.getElementById("qrcode"),{
+text:`${o.id} | ${o.tracking} | ${o.item}`,
+width:160,
+height:160
+});
+}
+
+/* PDF */
+function downloadInvoice(){
+
+if(!active){alert("Belum ada order");return;}
+
+const {jsPDF}=window.jspdf;
+let doc=new jsPDF();
+
+doc.setFontSize(14);
+doc.text("INVOICE PAKETINAJA",10,10);
+
+doc.text("ID: "+active.id,10,25);
+doc.text("Tracking: "+active.tracking,10,35);
+doc.text("Barang: "+active.item,10,45);
+doc.text("Kota: "+active.city,10,55);
+
+doc.text("Pengirim: "+active.sender,10,65);
+doc.text("Penerima: "+active.receiver,10,75);
+doc.text("Alamat: "+active.address,10,85);
+
+doc.text("Total: Rp "+active.total.toLocaleString(),10,100);
+doc.text("Status: "+active.status,10,110);
+
+doc.save("invoice-paketinaja.pdf");
+}
+
+</script>
+
+</body>
+</html>
